@@ -8,7 +8,7 @@
 | Build your own Claude Code | [Repository](https://github.com/codecrafters-io/build-your-own-claude-code) | [Tester](https://github.com/codecrafters-io/claude-code-tester) |
 | Build your own Interpreter | [Repository](https://github.com/codecrafters-io/build-your-own-interpreter) | [Tester](https://github.com/codecrafters-io/interpreter-tester) |
 | Build your own BitTorrent  | [Repository](https://github.com/codecrafters-io/build-your-own-bittorrent)  | [Tester](https://github.com/codecrafters-io/bittorrent-tester)  |
-| Build your own Kafka       | [Repository](https://github.com/codecrafters-io/build-your-own-kafka)       | [Tester](https://github.com/codecrafters-io/kafka-tester)       |
+| Build your own Kafka       | [Repository](https://github.com/codecrafters-io/build-your-own-kafka)       | [Tester](https://github.com/codecrafters-io/kafka-tester) (MIT) |
 | Build your own Git         | [Repository](https://github.com/codecrafters-io/build-your-own-git)         | [Tester](https://github.com/codecrafters-io/git-tester)         |
 | Build your own SQLite      | [Repository](https://github.com/codecrafters-io/build-your-own-sqlite)      | [Tester](https://github.com/codecrafters-io/sqlite-tester)      |
 | Build your own DNS server  | [Repository](https://github.com/codecrafters-io/build-your-own-dns-server)  | [Tester](https://github.com/codecrafters-io/dns-server-tester)  |
