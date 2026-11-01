@@ -17,27 +17,69 @@ Provider support, in order of intent:
 - Further open-source guided projects.
 
 The project is under active development. Do not assume an API exists just
-because a type or constant does; much of `internal/` is scaffolding.
+because a type or constant does; some packages are scaffolding for work that is
+not wired up yet.
 
 ## Layout
 
 ```
-cmd/quest/                intended entry point for the TUI (currently a stub)
-cmd/test/                 scratch main, currently decodes a local course-definition.yml
-internal/codecrafters/    CodeCrafters domain model
-  definitions.go          CourseDefinition and nested types, mirrors course-definition.yml
-  sources.go              pinned upstream sources: spec commits, tester releases, asset hashes
-  README.md               upstream repo table with license status
-temp/                     gitignored scratch clones of upstream courses (reference only)
+cmd/quest/main.go             thin entry point: config, provider wiring, tea.NewProgram
+
+internal/config/              user paths: cache dir, local definitions dir
+internal/provider/            contracts every problem source implements
+  provider.go                 Provider, Course, Stage, TesterPlan, LicenseStatus
+  aoc/                        Advent of Code (static years for now)
+  codecrafters/
+    definitions.go            CourseDefinition and nested types, mirrors course-definition.yml
+    sources.go                pinned upstream sources: spec commits, tester releases, asset hashes
+    adapter.go                adapts the pinned sources + definitions to provider.Course
+    README.md                 upstream repo table with license status
+internal/cache/               user cache directory, asset storage, SHA256 verification
+internal/licensing/           license policy: which testers need explicit consent
+internal/runner/              tester execution contract; simulated runner for now
+internal/ui/                  Bubble Tea / Lip Gloss / Glamour code
+  app.go                      root model, routing, layout, chrome
+  catalog.go                  catalog screen: resources, courses, language
+  course.go                   course screen: stages, description, test output
+  theme.go                    palette, glamour renderer, help/list styles
+  panel.go                    panel geometry and text fitting
+  rows.go                     shared list row delegate
+  keys.go                     key maps and help bindings
+temp/                         gitignored scratch clones of upstream courses (reference only)
 ```
 
-Module: `github.com/aadhii-yz/quest`. Go 1.27.1. Only dependency is
-`gopkg.in/yaml.v3`. There is no Makefile, no CI config and no test suite yet —
-do not invent commands that do not exist.
+Module: `github.com/aadhii-yz/quest`. Go 1.27.1.
 
-`cmd/quest` is where the TUI belongs. If `go build ./...` fails with
-"function main is undeclared in the main package", `cmd/quest/main.go` is a
-stub, not a regression — do not delete it or add a dummy `main` to silence it.
+Dependencies: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`,
+`charm.land/lipgloss/v2`, `charm.land/glamour/v2`, `gopkg.in/yaml.v3`. Standard
+library first; justify any addition.
+
+## Architecture rules
+
+Dependencies point one way:
+
+```
+cmd/quest -> internal/ui -> internal/provider, internal/runner, internal/cache, internal/licensing
+internal/ui -> internal/config            (paths only)
+internal/provider/codecrafters -> internal/provider, internal/codecrafters wire types
+internal/cache, internal/runner, internal/licensing -> internal/provider
+```
+
+- `internal/provider` and its adapters must not import Bubble Tea, Lip Gloss,
+  Glamour or any other UI package. They describe what exists; they never
+  render, prompt or fetch tester binaries.
+- `internal/ui` must not import `internal/provider/codecrafters` or any
+  provider implementation. It works only with `provider.Provider`,
+  `provider.Course`, `provider.Stage` and `provider.TesterPlan`, which keeps
+  new providers additive.
+- Providers expose availability and license posture through `TesterPlan`. They
+  must not download or execute testers; that belongs to `internal/cache`,
+  `internal/licensing` and `internal/runner`.
+- Execution output reaches the UI as `runner.Event` values. Do not fabricate
+  tester output, verification steps or pass/fail results in UI code.
+- Read environment variables and user paths in `internal/config` or in
+  `cmd/quest`, not inside domain packages. Inject paths (for example the local
+  definitions directory) rather than calling `os.Getenv` deep in an adapter.
 
 ## Commands
 
@@ -45,11 +87,13 @@ stub, not a regression — do not delete it or add a dummy `main` to silence it.
 go build ./...
 go vet ./...
 gofmt -l .                # must print nothing before committing
-go run ./cmd/test         # needs temp/build-your-own-grep/course-definition.yml present
+go test ./...
+go run ./cmd/quest        # reads course-definition.yml from temp/ by default
 ```
 
-No tests exist. If you add tests, they are plain `go test` packages; there is
-no test harness to extend.
+`QUEST_DEFS_DIR` overrides the local definitions directory; `QUEST_CACHE_DIR`
+overrides the cache directory. There is no Makefile and no CI config; do not
+invent commands that do not exist.
 
 ## Licensing and upstream safety
 
@@ -65,13 +109,17 @@ party code executed on a user's machine.
   prebuilt release asset per platform, verify its SHA256, execute it. Do not
   add a `git clone` path.
 - **Never resolve `"latest"` at runtime.** Releases are pinned in
-  `sources.go`. `TesterRelease` is also required to construct asset filenames,
-  so runtime resolution would break the hash guarantee.
+  `internal/provider/codecrafters/sources.go`. `TesterRelease` is also required
+  to construct asset filenames, so runtime resolution would break the hash
+  guarantee.
 - **Always verify SHA256 before extracting or executing** an asset, and fail
-  closed on mismatch. A mismatch is not a warning.
-- **Downloading is not permission.** `TesterLicense` exists to gate behaviour:
-  do not download or run an `LicenseNone` tester without explicit, specific
-  user consent that names the missing license.
+  closed on mismatch. A mismatch is not a warning. Verification belongs in
+  `internal/cache`; never add a code path that extracts or executes an asset
+  without it.
+- **Downloading is not permission.** `provider.LicenseStatus` exists to gate
+  behaviour: do not download or run an `LicenseNone` tester without explicit,
+  specific user consent that names the missing license. Consent policy lives
+  in `internal/licensing`, not in the UI.
 - Downloaded assets must live in a user-visible, user-deletable cache directory
   (created `0700`), never inside the repo tree or a release artifact.
 - Do not implement anything that decompiles a tester binary to extract test
@@ -83,9 +131,9 @@ text.
 
 ## Updating pinned sources
 
-`sources.go` pins, per course: spec repo commit, tester release tag, the
-checksums.txt URL, and every published asset URL + SHA256 keyed by `Arch*`
-constants.
+`internal/provider/codecrafters/sources.go` pins, per course: spec repo commit,
+tester release tag, the checksums.txt URL, and every published asset URL +
+SHA256 keyed by `Arch*` constants.
 
 To bump a pin:
 
@@ -113,6 +161,8 @@ platform must be reported to the user, not read as a zero-valued `Asset`.
 
 ## Code conventions
 
+Domain and wire format:
+
 - YAML tags in `definitions.go` mirror upstream field names exactly. Treat them
   as a wire format: do not rename, and do not drop `omitempty` from
   `PrimaryExtensionSlug` — base stages omit that key entirely.
@@ -125,7 +175,47 @@ platform must be reported to the user, not read as a zero-valued `Asset`.
 - Prefer adding a field to `Source` over hardcoding upstream facts in UI or
   command code. `sources.go` is the single source of truth for pins and
   licenses.
-- Standard library first. Justify any new dependency.
+- Provider interface methods stay small and data-only (`ID`, `Name`, `Note`,
+  `Planned`, `Courses`). Adding network fetching later means returning data
+  through a command/service, not adding `Run`/`Download` to a provider.
+
+UI:
+
+- One `internal/ui` package. Split files by screen (`catalog.go`, `course.go`),
+  not into a package per pane; panes share selection and focus state. Add an
+  `internal/ui/components` subpackage only when a widget is independent of the
+  theme and genuinely reused.
+- Palette, borders, spacing and Markdown rendering live in `theme.go`. Panel
+  geometry (`panel`, `panelInner`, `fit`, `bar`) lives in `panel.go` and must
+  stay in one place. In Lip Gloss v2, `Width`/`Height` include border and
+  padding — remember this when sizing panes.
+- List rows implement the shared `rowItem`/`rowDelegate` in `rows.go`; set the
+  list's width to the panel's inner content width or rows will wrap.
+- Key bindings and help text live in `keys.go`; every screen exposes a
+  `help.KeyMap`. Do not hardcode footer hint strings.
+- Components are updated in `Update`; the root model forwards unrecognised
+  messages to the focused component (filter matches, cursor blinks, runner
+  events). Swallowing component messages breaks Bubble Tea components.
+
+Runner and cache:
+
+- `internal/runner` emits plain-text events in order, ending with a done event.
+  The UI styles them; it must not invent them. Real execution must be
+  cancellable with `context.Context`.
+- `internal/cache` owns the `0700` directory, extraction and SHA256 checks. It
+  must offer no "skip verification" option. Show asset size before starting a
+  download of a large asset.
+
+Tests:
+
+- Plain `go test` packages, no harness. Keep unit tests free of network access
+  and of real tester execution.
+- Cover provider adapters (definition discovery, stage mapping, platform
+  availability), cache verification (mismatch fails closed), licensing policy
+  and runner event ordering.
+- Keep at least one render-invariant test in `internal/ui`: fixed window sizes,
+  exact frame height, no line wider than the terminal, no panic at small
+  sizes. Use fake providers; do not read `temp/`.
 
 ## Commit messages
 
@@ -147,8 +237,12 @@ Co-Authored-By: DeepSeek-V4.1-Flash via Pi Agent
 
 ## Do not
 
-- Treat `cmd/test/` as a stable entry point; it is a scratch harness.
-- "Fix" a `cmd/quest` build error by adding a placeholder `main` or by
-  deleting the package.
+- Add UI imports to `internal/provider`, `internal/cache`, `internal/runner` or
+  `internal/licensing`.
+- Import a provider implementation from `internal/ui`.
+- Put license, SHA256 or download policy in the UI, or skip SHA256 verification
+  anywhere.
+- Add a placeholder `main` or delete `cmd/quest` to silence a build error.
 - Add network calls to `definitions.go` or `sources.go`; both are static data
   and pure types.
+- Reintroduce `cmd/test/`; put definition parsing tests next to the adapter.
