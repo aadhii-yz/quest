@@ -1,2 +1,6 @@
-quest
+# Binary at the repo root
+/quest
+/quest.exe
+
+# Scratch folder
 temp/
