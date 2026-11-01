@@ -18,7 +18,8 @@ Provider support, in order of intent:
 
 The project is under active development. Do not assume an API exists just
 because a type or constant does; some packages are scaffolding for work that is
-not wired up yet.
+not wired up yet. Current phases and open decisions live in
+[ROADMAP.md](ROADMAP.md).
 
 ## Layout
 
@@ -45,6 +46,7 @@ internal/ui/                  Bubble Tea / Lip Gloss / Glamour code
   panel.go                    panel geometry and text fitting
   rows.go                     shared list row delegate
   keys.go                     key maps and help bindings
+content/                      separate git repo (gitignored here): per-course content bundles
 temp/                         gitignored scratch clones of upstream courses (reference only)
 ```
 
@@ -81,6 +83,30 @@ internal/cache, internal/runner, internal/licensing -> internal/provider
   `cmd/quest`, not inside domain packages. Inject paths (for example the local
   definitions directory) rather than calling `os.Getenv` deep in an adapter.
 
+## Content repository (track B)
+
+`content/` is a **separate git repository**, ignored by this one. It pins the
+spec commits of the MIT course repositories and publishes immutable per-course
+bundles (course-definition.yml, LICENSE, stage_descriptions, starter_templates,
+manifest.json), plus an index and checksums. Its rules live in
+`content/AGENTS.md`; the format and consumer contract live in
+`content/docs/bundle-format.md` and `content/docs/quest-integration.md`.
+
+- Never commit the nested repository or its `dist/` output to quest, and never
+  copy bundle files into this tree.
+- When a spec commit is bumped in `internal/provider/codecrafters/sources.go`,
+  the same commit must be pinned in `content/courses.json` and a new content
+  release cut. Do not let the two drift.
+- Content is consumed only through `internal/cache` verification: pin a release
+  tag and the `index.json` digest, verify the bundle digest and size, extract
+  safely, then require the manifest `spec.commit` to equal this repo's pin.
+  Never resolve a content "latest" release.
+- Content bundles are data. Never execute anything from a bundle, and never let
+  a bundle carry tester source, tester binaries or executable assets.
+- Integration is Phase 3 in ROADMAP.md. Until it lands, local
+  `course-definition.yml` files under `temp/` remain the only content source;
+  do not half-wire bundle fetching.
+
 ## Commands
 
 ```sh
@@ -90,6 +116,9 @@ gofmt -l .                # must print nothing before committing
 go test ./...
 go run ./cmd/quest        # reads course-definition.yml from temp/ by default
 ```
+
+The content repository has its own module and commands; see
+`content/AGENTS.md` (`cd content && go test ./...`).
 
 `QUEST_DEFS_DIR` overrides the local definitions directory; `QUEST_CACHE_DIR`
 overrides the cache directory. There is no Makefile and no CI config; do not
@@ -246,3 +275,7 @@ Co-Authored-By: DeepSeek-V4.1-Flash via Pi Agent
 - Add network calls to `definitions.go` or `sources.go`; both are static data
   and pure types.
 - Reintroduce `cmd/test/`; put definition parsing tests next to the adapter.
+- Commit, vendor or copy the `content/` repository or its release output into
+  this tree.
+- Fetch content bundles without verifying the pinned index and bundle digests,
+  or trust a bundle whose manifest `spec.commit` differs from `sources.go`.
