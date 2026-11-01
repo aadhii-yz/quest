@@ -61,7 +61,7 @@ Dependencies point one way:
 ```
 cmd/quest -> internal/ui -> internal/provider, internal/runner, internal/cache, internal/licensing
 internal/ui -> internal/config            (paths only)
-internal/provider/codecrafters -> internal/provider, internal/codecrafters wire types
+internal/provider/codecrafters -> internal/provider, YAML wire types and pins
 internal/cache, internal/runner, internal/licensing -> internal/provider
 ```
 

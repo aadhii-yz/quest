@@ -1,15 +1,6 @@
 package codecrafters
 
-// LicenseStatus describes the licensing of a CodeCrafters repository.
-type LicenseStatus string
-
-const (
-	// LicenseMIT means the repository is published under the MIT License.
-	LicenseMIT LicenseStatus = "MIT"
-	// LicenseNone means the repository ships no license file, so all rights are
-	// reserved by the author. Absence of a license is not permission to use.
-	LicenseNone LicenseStatus = "No License"
-)
+import "github.com/aadhii-yz/quest/internal/provider"
 
 // OS/architecture keys used in Source.Assets. They match the values
 // produced by `go tool dist list`, so callers can build the key from
@@ -41,7 +32,7 @@ type Source struct {
 	// pinning keeps generated content reproducible and avoids surprise upstream
 	// edits changing stage text out from under a saved session.
 	RepoCommit  string
-	RepoLicense LicenseStatus
+	RepoLicense provider.LicenseStatus
 
 	// TesterURL is the tester suite repository.
 	TesterURL string
@@ -50,7 +41,7 @@ type Source struct {
 	TesterRelease string
 	// TesterChecksumsURL points at the release's checksums.txt.
 	TesterChecksumsURL string
-	TesterLicense      LicenseStatus
+	TesterLicense      provider.LicenseStatus
 
 	// Assets maps an OS/architecture key (see the Arch* constants) to the
 	// prebuilt tester binary for that platform. Not every course ships every
@@ -78,12 +69,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-shell",
 		RepoCommit:  "1b6a5b9a16f695429352f12e8289b96b7a0314bb",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/shell-tester",
 		TesterRelease:      "v133",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/shell-tester/releases/download/v133/shell-tester_133_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -109,12 +100,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-redis",
 		RepoCommit:  "09b175e62b02299d190465092d45aeaaa6435855",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/redis-tester",
 		TesterRelease:      "v213",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/redis-tester/releases/download/v213/redis-tester_213_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -140,12 +131,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-grep",
 		RepoCommit:  "6d54daaad5632b077289c750f01e0df61b4fde98",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/grep-tester",
 		TesterRelease:      "v65",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/grep-tester/releases/download/v65/grep-tester_65_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -171,12 +162,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-claude-code",
 		RepoCommit:  "56a12aeef52d2748eaf51a20e44e613f4bbee59a",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/claude-code-tester",
 		TesterRelease:      "v14",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/claude-code-tester/releases/download/v14/claude-code-tester_14_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -202,12 +193,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-interpreter",
 		RepoCommit:  "e05193b218567c80504f5358585fbfe2908ffbca",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/interpreter-tester",
 		TesterRelease:      "v64",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/interpreter-tester/releases/download/v64/interpreter-tester_64_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -233,12 +224,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-bittorrent",
 		RepoCommit:  "2c63fcce4328dee6faeb682b21206d2b26b510a5",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/bittorrent-tester",
 		TesterRelease:      "v81",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/bittorrent-tester/releases/download/v81/bittorrent-tester_81_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -264,13 +255,13 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-kafka",
 		RepoCommit:  "d759358f0f880994ae6ba86871523310b39fc0c9",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/kafka-tester",
 		TesterRelease:      "v44",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/kafka-tester/releases/download/v44/kafka-tester_44_checksums.txt",
 		// Unlike the other testers, this one ships an MIT LICENSE file.
-		TesterLicense: LicenseMIT,
+		TesterLicense: provider.LicenseMIT,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -296,12 +287,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-git",
 		RepoCommit:  "34f4e91a91f8a435830eca21080b6e5e0b1ec48a",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/git-tester",
 		TesterRelease:      "v57",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/git-tester/releases/download/v57/git-tester_57_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -327,12 +318,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-sqlite",
 		RepoCommit:  "b58b43a5b0b5321ac39fe05bc7298bd30d924654",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/sqlite-tester",
 		TesterRelease:      "v73",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/sqlite-tester/releases/download/v73/sqlite-tester_73_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		// These assets are ~365 MB each because the tester embeds sqlite
 		// binaries. Surface the download size before starting.
@@ -356,12 +347,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-dns-server",
 		RepoCommit:  "6665dd2fd72ab3ef709c14a0236befac1941ab38",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/dns-server-tester",
 		TesterRelease:      "v29",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/dns-server-tester/releases/download/v29/dns-server-tester_29_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -387,12 +378,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-http-server",
 		RepoCommit:  "e086ba45900544ab17cd7f5bc9c4f094c8e87157",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/http-server-tester",
 		TesterRelease:      "v59",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/http-server-tester/releases/download/v59/http-server-tester_59_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {
@@ -418,12 +409,12 @@ var Sources = []Source{
 
 		RepoURL:     "https://github.com/codecrafters-io/build-your-own-docker",
 		RepoCommit:  "3c07c87a45f32355a298505d7ca75372aed3ca95",
-		RepoLicense: LicenseMIT,
+		RepoLicense: provider.LicenseMIT,
 
 		TesterURL:          "https://github.com/codecrafters-io/docker-tester",
 		TesterRelease:      "v54",
 		TesterChecksumsURL: "https://github.com/codecrafters-io/docker-tester/releases/download/v54/docker-tester_54_checksums.txt",
-		TesterLicense:      LicenseNone,
+		TesterLicense:      provider.LicenseNone,
 
 		Assets: map[string]Asset{
 			ArchDarwinAMD64: {

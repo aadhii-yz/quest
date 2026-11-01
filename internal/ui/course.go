@@ -1,16 +1,17 @@
-package main
+package ui
 
 import (
+	"context"
 	"fmt"
-	"runtime"
 	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/aadhii-yz/quest/internal/codecrafters"
+
+	"github.com/aadhii-yz/quest/internal/provider"
+	"github.com/aadhii-yz/quest/internal/runner"
 )
 
 const (
@@ -30,18 +31,20 @@ const (
 const maxLogLines = 300
 
 type stageItem struct {
-	stage codecrafters.Stage
-	num   int
+	stage provider.Stage
 }
 
 func (i stageItem) FilterValue() string { return i.stage.Name }
 func (i stageItem) row() (string, string) {
-	return fmt.Sprintf("%2d %s", i.num, i.stage.Name), difficultyLabel(i.stage.Difficulty)
+	return fmt.Sprintf("%2d %s", i.stage.Number, i.stage.Name), difficultyLabel(i.stage.Difficulty)
 }
 
+// courseModel is the course screen: a stage list, a description viewport and a
+// test output viewport, with the panes independently toggleable.
 type courseModel struct {
 	theme   *theme
-	course  *course
+	course  provider.Course
+	runner  runner.Runner
 	langIdx int
 
 	stages list.Model
@@ -49,9 +52,9 @@ type courseModel struct {
 	log    viewport.Model
 
 	logLines []string
-	steps    []string
+	events   <-chan runner.Event
+	cancel   context.CancelFunc
 	run      runState
-	seq      int
 
 	showStages bool
 	showTests  bool
@@ -61,20 +64,17 @@ type courseModel struct {
 	stageW        int
 	descH, testH  int
 
-	stageIdx int
 	descKey  string
 	descSlug string
 }
 
-type runTickMsg struct{ seq int }
-
-func newCourseModel(t *theme, c *course, langIdx int) *courseModel {
-	if len(c.languages) > 0 {
-		langIdx = clampInt(langIdx, 0, len(c.languages)-1)
+func newCourseModel(t *theme, c provider.Course, langIdx int, r runner.Runner) *courseModel {
+	if len(c.Languages) > 0 {
+		langIdx = clampInt(langIdx, 0, len(c.Languages)-1)
 	}
-	items := make([]list.Item, 0, len(c.stages))
-	for i, stage := range c.stages {
-		items = append(items, stageItem{stage: stage, num: i + 1})
+	items := make([]list.Item, 0, len(c.Stages))
+	for _, stage := range c.Stages {
+		items = append(items, stageItem{stage: stage})
 	}
 	stages := newRowList(items, t, false, "stages")
 	stages.Select(0)
@@ -90,6 +90,7 @@ func newCourseModel(t *theme, c *course, langIdx int) *courseModel {
 	m := &courseModel{
 		theme:      t,
 		course:     c,
+		runner:     r,
 		langIdx:    langIdx,
 		stages:     stages,
 		desc:       desc,
@@ -106,13 +107,18 @@ func newCourseModel(t *theme, c *course, langIdx int) *courseModel {
 	return m
 }
 
-func (c *courseModel) language() string { return c.course.languageAt(c.langIdx) }
+func (c *courseModel) language() string {
+	if len(c.course.Languages) == 0 {
+		return ""
+	}
+	return c.course.Languages[clampInt(c.langIdx, 0, len(c.course.Languages)-1)]
+}
 
-func (c *courseModel) stage() (codecrafters.Stage, bool) {
+func (c *courseModel) stage() (provider.Stage, bool) {
 	if item, ok := c.stages.SelectedItem().(stageItem); ok {
 		return item.stage, true
 	}
-	return codecrafters.Stage{}, false
+	return provider.Stage{}, false
 }
 
 func (c *courseModel) visiblePanes() []int {
@@ -149,7 +155,7 @@ func (c *courseModel) ensureFocus() {
 }
 
 func (c *courseModel) nextLanguage() {
-	if n := len(c.course.languages); n > 0 {
+	if n := len(c.course.Languages); n > 0 {
 		c.langIdx = (c.langIdx + 1) % n
 	}
 }
@@ -166,7 +172,6 @@ func (c *courseModel) selectStage(delta int) {
 }
 
 func (c *courseModel) syncStage() {
-	c.stageIdx = c.stages.Index()
 	c.refreshDescription(false)
 }
 
@@ -242,25 +247,25 @@ func (c *courseModel) refreshDescription(force bool) {
 		return
 	}
 
-	key := fmt.Sprintf("%d|%s|%t", c.desc.Width(), stage.Slug, c.theme.isDark)
+	key := fmt.Sprintf("%d|%s|%t", c.desc.Width(), stage.ID, c.theme.isDark)
 	if key == c.descKey {
 		return
 	}
-	stageChanged := stage.Slug != c.descSlug
-	c.descKey, c.descSlug = key, stage.Slug
+	stageChanged := stage.ID != c.descSlug
+	c.descKey, c.descSlug = key, stage.ID
 
 	var b strings.Builder
 	meta := make([]string, 0, 3)
 	if d := difficultyLabel(stage.Difficulty); d != "" {
 		meta = append(meta, d)
 	}
-	if stage.PrimaryExtensionSlug != "" {
-		meta = append(meta, "extension "+stage.PrimaryExtensionSlug)
+	if stage.Extension != "" {
+		meta = append(meta, "extension "+stage.Extension)
 	}
-	meta = append(meta, "slug "+stage.Slug)
+	meta = append(meta, "slug "+stage.ID)
 	b.WriteString(c.theme.muted(strings.Join(meta, " · ")))
 	b.WriteString("\n\n")
-	b.WriteString(c.theme.markdown(stage.MarketingMD, c.desc.Width()))
+	b.WriteString(c.theme.markdown(stage.Description, c.desc.Width()))
 
 	c.desc.SetContent(b.String())
 	if stageChanged || force {
@@ -272,13 +277,11 @@ func (c *courseModel) emptyDescription() string {
 	var b strings.Builder
 	b.WriteString(c.theme.bold("No stage list loaded"))
 	b.WriteString("\n\n")
-	b.WriteString(c.theme.muted("This course has no course-definition.yml attached yet."))
-	b.WriteString("\n\n")
-	if c.course.note != "" {
-		b.WriteString(c.theme.muted(c.course.note))
-		b.WriteString("\n\n")
+	if c.course.Note != "" {
+		b.WriteString(c.theme.muted(c.course.Note))
+	} else {
+		b.WriteString(c.theme.muted("This course has no stage list attached yet."))
 	}
-	b.WriteString(c.theme.muted("Place course-definition.yml under " + defsDir() + "/<course>/ and reopen."))
 	return b.String()
 }
 
@@ -305,81 +308,77 @@ func (c *courseModel) appendLog(lines ...string) {
 	c.refreshLog()
 }
 
-// startRun begins a simulated test run. Real execution must go through the
-// pinned-release download, sha256 verification and consent gate first.
+// startRun asks the runner for an event stream. The simulated runner is the
+// only implementation today; real execution must go through cache verification
+// and the licensing gate first.
 func (c *courseModel) startRun() tea.Cmd {
-	if c.run == runRunning {
+	if c.run == runRunning || c.runner == nil {
 		return nil
 	}
-	c.seq++
-	c.run = runRunning
-	c.steps = c.runScript()
-	c.appendLog("")
-	if len(c.steps) == 0 {
-		c.run = runDone
-		return nil
-	}
-	c.appendLog(c.steps[0])
-	c.steps = c.steps[1:]
-	if len(c.steps) == 0 {
-		c.run = runDone
-		return nil
-	}
-	return c.tick()
-}
-
-func (c *courseModel) tick() tea.Cmd {
-	seq := c.seq
-	return tea.Tick(220*time.Millisecond, func(time.Time) tea.Msg {
-		return runTickMsg{seq: seq}
-	})
-}
-
-func (c *courseModel) advance(msg runTickMsg) tea.Cmd {
-	if msg.seq != c.seq || c.run != runRunning {
-		return nil
-	}
-	if len(c.steps) == 0 {
-		c.run = runDone
-		return nil
-	}
-	c.appendLog(c.steps[0])
-	c.steps = c.steps[1:]
-	if len(c.steps) == 0 {
-		c.run = runDone
-		return nil
-	}
-	return c.tick()
-}
-
-func (c *courseModel) runScript() []string {
 	stage, ok := c.stage()
-	stageSlug, stageName := "unknown", "current stage"
-	if ok {
-		stageSlug, stageName = stage.Slug, stage.Name
+	if !ok {
+		c.appendLog("FAIL  no stage selected")
+		return nil
 	}
-	lines := []string{
-		fmt.Sprintf("$ quest-tester run --stage %s --language %s", stageSlug, c.language()),
+
+	c.stopRun()
+	ctx, cancel := context.WithCancel(context.Background())
+	events, err := c.runner.Run(ctx, runner.Request{
+		CourseID: c.course.ID,
+		Stage:    stage,
+		Language: c.language(),
+		Tester:   c.course.Tester,
+	})
+	if err != nil {
+		cancel()
+		c.run = runDone
+		c.appendLog("FAIL  " + err.Error())
+		return nil
 	}
-	if !c.course.assetOK {
-		return append(lines,
-			fmt.Sprintf("no pinned tester build for %s/%s", runtime.GOOS, runtime.GOARCH),
-			"FAIL  nothing to run on this platform",
-		)
+	c.cancel = cancel
+	c.events = events
+	c.run = runRunning
+	c.appendLog("")
+	return waitForRunEvent(events)
+}
+
+type runEventMsg runner.Event
+
+func waitForRunEvent(events <-chan runner.Event) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-events
+		if !ok {
+			return runEventMsg(runner.Event{Done: true})
+		}
+		return runEventMsg(ev)
 	}
-	lines = append(lines,
-		"note: simulated run — real tester execution is not wired up yet",
-		fmt.Sprintf("[1/4] resolved pinned release %s", c.course.testerTag),
-		fmt.Sprintf("[2/4] verified sha256 of %s", c.course.testerName),
-		"[3/4] extracted into the user cache directory",
-		fmt.Sprintf("[4/4] running checks for %q", stageName),
-		"ok    "+stageName,
-		"PASS  0 failures, 2 checks",
-	)
-	if c.course.license == codecrafters.LicenseNone {
-		lines = append(lines, "warning: this tester has no license; running it needs explicit consent")
+}
+
+// handleEvent appends runner output and re-arms the wait until the stream ends.
+func (c *courseModel) handleEvent(msg runEventMsg) tea.Cmd {
+	ev := runner.Event(msg)
+	if ev.Line != "" {
+		c.appendLog(ev.Line)
 	}
-	return lines
+	if ev.Done {
+		c.run = runDone
+		c.stopRun()
+		return nil
+	}
+	if c.events == nil {
+		c.run = runDone
+		return nil
+	}
+	return waitForRunEvent(c.events)
+}
+
+// stopRun cancels an in-flight run and drops the event stream.
+func (c *courseModel) stopRun() {
+	if c.cancel != nil {
+		c.cancel()
+		c.cancel = nil
+	}
+	c.events = nil
 }
 
 func (c *courseModel) view() string {
@@ -388,7 +387,7 @@ func (c *courseModel) view() string {
 	if c.stageW > 0 {
 		rightW = c.width - c.stageW - 1
 		stagePanel = c.theme.panel(
-			c.theme.accentBold(fmt.Sprintf("stages · %d", len(c.course.stages))),
+			c.theme.accentBold(fmt.Sprintf("stages · %d", len(c.course.Stages))),
 			c.stages.View(), c.stageW, c.height, c.focus == paneStages,
 		)
 	}
@@ -412,7 +411,7 @@ func (c *courseModel) descTitle() string {
 	if !ok {
 		return c.theme.accentBold("stage")
 	}
-	title := fmt.Sprintf("stage %d/%d", c.stages.Index()+1, len(c.course.stages))
+	title := fmt.Sprintf("stage %d/%d", stage.Number, len(c.course.Stages))
 	return c.theme.accentBold(title) + c.theme.muted(" · "+stage.Name)
 }
 
@@ -428,13 +427,13 @@ func (c *courseModel) testTitle() string {
 }
 
 func (c *courseModel) title() string {
-	return c.theme.accentBold(c.course.provider) + c.theme.muted(" · ") + c.theme.bold(c.course.name)
+	return c.theme.accentBold(c.course.ProviderName) + c.theme.muted(" · ") + c.theme.bold(c.course.Name)
 }
 
 func (c *courseModel) meta() string {
 	meta := c.theme.muted(c.language())
-	if _, ok := c.stage(); ok {
-		meta += c.theme.muted(fmt.Sprintf(" · stage %d/%d", c.stages.Index()+1, len(c.course.stages)))
+	if stage, ok := c.stage(); ok {
+		meta += c.theme.muted(fmt.Sprintf(" · stage %d/%d", stage.Number, len(c.course.Stages)))
 	}
 	return meta
 }
