@@ -14,8 +14,8 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 - `internal/cache` has a 0700 store and fail-closed SHA256 verification, but no
   download or extraction yet.
 - `internal/licensing` has the `LicenseNone` policy, but no persisted consent.
-- Content bundles pipeline exists in `quest-source/` and builds all 12 CodeCrafters
-  courses; no release has been published and quest does not consume it yet.
+- Content bundles pipeline exists in `quest-source/` and `content-0.1.0` is
+  published with all 12 CodeCrafters courses; quest does not consume it yet.
 
 ## Decisions made
 
@@ -81,9 +81,19 @@ and a tampered asset or missing consent blocks execution.
 
 ## Phase 3 — content integration
 
-- [ ] Publish `content-0.1.0` from `quest-source/` (all 12 bundles + index +
+First release is live and verified:
+
+```
+release:  https://github.com/aadhii-yz/quest-source/releases/tag/content-0.1.0
+repo:     aadhii-yz/quest-source
+index:    sha256 c0f520f9053980eda7759cf43de20618a2f5ec50f9f2353ce45e3af744975dce
+assets:   12 course bundles + index.json + checksums.txt (all checksums pass)
+```
+
+- [x] Publish `content-0.1.0` from `quest-source/` (all 12 bundles + index +
       checksums; `sha256sum -c` verified).
-- [ ] Pin `ContentRelease`, `ContentRepo` and `ContentIndexSHA256` in the
+- [ ] Pin `ContentRelease` (`content-0.1.0`), `ContentRepo`
+      (`aadhii-yz/quest-source`) and `ContentIndexSHA256` (`c0f520f9…`) in the
       CodeCrafters adapter.
 - [ ] Fetch the index through `internal/cache`, verify the digest, cache it;
       render the catalog from the index without downloading bundles.
