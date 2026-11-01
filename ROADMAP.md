@@ -3,7 +3,7 @@
 Working plan for quest. Update this file when a decision lands, so a new session
 can pick up without re-deriving context. Architecture rules live in
 [AGENTS.md](AGENTS.md); the content pipeline lives in the nested, gitignored
-repo at `content/` (see `content/AGENTS.md` and `content/docs/`).
+repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 
 ## Current state
 
@@ -14,7 +14,7 @@ repo at `content/` (see `content/AGENTS.md` and `content/docs/`).
 - `internal/cache` has a 0700 store and fail-closed SHA256 verification, but no
   download or extraction yet.
 - `internal/licensing` has the `LicenseNone` policy, but no persisted consent.
-- Content bundles pipeline exists in `content/` and builds all 12 CodeCrafters
+- Content bundles pipeline exists in `quest-source/` and builds all 12 CodeCrafters
   courses; no release has been published and quest does not consume it yet.
 
 ## Decisions made
@@ -27,7 +27,7 @@ repo at `content/` (see `content/AGENTS.md` and `content/docs/`).
   `codecrafters` CLI) implementation. Explicit selection only; no silent
   fallback. Consent applies to the direct backend.
 - **Content is prebuilt, pinned and verified:** per-course bundles plus an
-  index in `content/`, consumed via the same verified-download path as testers.
+  index in `quest-source/`, consumed via the same verified-download path as testers.
   The app validates the bundle manifest's `spec.commit` against its own pins.
 - **Compatibility:** content format version and quest pins move together; a
   bundle from a different spec commit is rejected.
@@ -81,7 +81,7 @@ and a tampered asset or missing consent blocks execution.
 
 ## Phase 3 — content integration
 
-- [ ] Publish `content-0.1.0` from `content/` (all 12 bundles + index +
+- [ ] Publish `content-0.1.0` from `quest-source/` (all 12 bundles + index +
       checksums; `sha256sum -c` verified).
 - [ ] Pin `ContentRelease`, `ContentRepo` and `ContentIndexSHA256` in the
       CodeCrafters adapter.

@@ -46,7 +46,7 @@ internal/ui/                  Bubble Tea / Lip Gloss / Glamour code
   panel.go                    panel geometry and text fitting
   rows.go                     shared list row delegate
   keys.go                     key maps and help bindings
-content/                      separate git repo (gitignored here): per-course content bundles
+quest-source/                 separate git repo (gitignored here): per-course content bundles
 temp/                         gitignored scratch clones of upstream courses (reference only)
 ```
 
@@ -85,17 +85,17 @@ internal/cache, internal/runner, internal/licensing -> internal/provider
 
 ## Content repository (track B)
 
-`content/` is a **separate git repository**, ignored by this one. It pins the
+`quest-source/` is a **separate git repository**, ignored by this one. It pins the
 spec commits of the MIT course repositories and publishes immutable per-course
 bundles (course-definition.yml, LICENSE, stage_descriptions, starter_templates,
 manifest.json), plus an index and checksums. Its rules live in
-`content/AGENTS.md`; the format and consumer contract live in
-`content/docs/bundle-format.md` and `content/docs/quest-integration.md`.
+`quest-source/AGENTS.md`; the format and consumer contract live in
+`quest-source/docs/bundle-format.md` and `quest-source/docs/quest-integration.md`.
 
 - Never commit the nested repository or its `dist/` output to quest, and never
   copy bundle files into this tree.
 - When a spec commit is bumped in `internal/provider/codecrafters/sources.go`,
-  the same commit must be pinned in `content/courses.json` and a new content
+  the same commit must be pinned in `quest-source/courses.json` and a new content
   release cut. Do not let the two drift.
 - Content is consumed only through `internal/cache` verification: pin a release
   tag and the `index.json` digest, verify the bundle digest and size, extract
@@ -118,7 +118,7 @@ go run ./cmd/quest        # reads course-definition.yml from temp/ by default
 ```
 
 The content repository has its own module and commands; see
-`content/AGENTS.md` (`cd content && go test ./...`).
+`quest-source/AGENTS.md` (`cd quest-source && go test ./...`).
 
 `QUEST_DEFS_DIR` overrides the local definitions directory; `QUEST_CACHE_DIR`
 overrides the cache directory. There is no Makefile and no CI config; do not
@@ -275,7 +275,7 @@ Co-Authored-By: DeepSeek-V4.1-Flash via Pi Agent
 - Add network calls to `definitions.go` or `sources.go`; both are static data
   and pure types.
 - Reintroduce `cmd/test/`; put definition parsing tests next to the adapter.
-- Commit, vendor or copy the `content/` repository or its release output into
+- Commit, vendor or copy the `quest-source/` repository or its release output into
   this tree.
 - Fetch content bundles without verifying the pinned index and bundle digests,
   or trust a bundle whose manifest `spec.commit` differs from `sources.go`.
