@@ -1,0 +1,4 @@
+# Keep text files LF in the working tree on every platform: Windows checkouts
+# default to CRLF, which makes gofmt report every file.
+* text=auto eol=lf
+*.go text eol=lf

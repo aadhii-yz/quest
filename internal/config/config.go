@@ -38,6 +38,12 @@ func resolveCacheDir() string {
 	if dir := os.Getenv(EnvCacheDir); dir != "" {
 		return dir
 	}
+	// Honor XDG_CACHE_HOME explicitly so the cache location is the same on
+	// every platform when the variable is set; os.UserCacheDir only consults
+	// it on Unix.
+	if dir := os.Getenv("XDG_CACHE_HOME"); dir != "" {
+		return filepath.Join(dir, "quest")
+	}
 	base, err := os.UserCacheDir()
 	if err != nil {
 		return filepath.Join(".", ".quest-cache")
