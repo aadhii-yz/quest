@@ -8,6 +8,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -21,6 +23,11 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
+		fmt.Println(version())
+		return
+	}
+
 	cfg := config.Resolve()
 	providers := []provider.Provider{
 		codecrafters.New(cfg.DefsDir),
@@ -36,4 +43,49 @@ func main() {
 		fmt.Fprintf(os.Stderr, "quest: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// buildVersion is injected for release builds with
+// -ldflags "-X main.buildVersion=<tag>". Local builds leave it empty and fall
+// back to module and VCS information.
+var buildVersion string
+
+// version reports the build version and revision. Release builds carry the tag
+// through buildVersion; `go install` carries a module version; local builds
+// fall back to "devel" plus the VCS revision recorded in the binary.
+func version() string {
+	v := buildVersion
+
+	var rev, dirty string
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if v == "" {
+			v = info.Main.Version
+		}
+		for _, setting := range info.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				rev = setting.Value
+			case "vcs.modified":
+				if setting.Value == "true" {
+					dirty = "-dirty"
+				}
+			}
+		}
+	}
+
+	return formatVersion(v, rev, dirty)
+}
+
+func formatVersion(v, rev, dirty string) string {
+	v = strings.TrimSuffix(v, "+dirty")
+	if v == "" || v == "(devel)" {
+		v = "devel"
+	}
+	if len(rev) > 12 {
+		rev = rev[:12]
+	}
+	if rev == "" {
+		return "quest " + v
+	}
+	return fmt.Sprintf("quest %s (%s)", v, rev+dirty)
 }

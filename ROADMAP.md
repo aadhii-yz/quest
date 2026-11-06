@@ -34,9 +34,9 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 
 ## Phase 0 — guardrails (next)
 
-- [ ] Add quest CI: build, vet, gofmt, `go test ./... -race` on linux, macOS and
+- [x] Add quest CI: build, vet, gofmt, `go test ./... -race` on linux, macOS and
       Windows.
-- [ ] Add quest release workflow on `v*` tags: matrix binaries, `checksums.txt`,
+- [x] Add quest release workflow on `v*` tags: matrix binaries, `checksums.txt`,
       `--version` from `debug.ReadBuildInfo()`.
 - [ ] Extend `internal/config` with tester backend selection
       (`tester = "direct" | "codecrafters-cli"`, `codecrafters_bin`), file +
