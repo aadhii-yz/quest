@@ -192,3 +192,12 @@ func sourceBySlug(t *testing.T, slug string) *Source {
 	t.Fatalf("source %q not found", slug)
 	return nil
 }
+
+func TestEmptyDefsDirLoadsNothing(t *testing.T) {
+	adapter := newAdapter("", "linux_amd64")
+	for _, c := range adapter.Courses() {
+		if c.Ready() {
+			t.Fatalf("course %q loaded stages from an empty definitions dir", c.ID)
+		}
+	}
+}

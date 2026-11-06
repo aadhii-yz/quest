@@ -47,7 +47,7 @@ internal/ui/                  Bubble Tea / Lip Gloss / Glamour code
   rows.go                     shared list row delegate
   keys.go                     key maps and help bindings
 quest-source/                 separate git repo (gitignored here): per-course content bundles
-temp/                         gitignored scratch clones of upstream courses (reference only)
+temp/                         gitignored scratch clones used only with QUEST_DEFS_DIR
 ```
 
 Module: `github.com/aadhii-yz/quest`. Go 1.27.1.
@@ -103,9 +103,13 @@ manifest.json), plus an index and checksums. Its rules live in
   Never resolve a content "latest" release.
 - Content bundles are data. Never execute anything from a bundle, and never let
   a bundle carry tester source, tester binaries or executable assets.
-- Integration is Phase 3 in ROADMAP.md. Until it lands, local
-  `course-definition.yml` files under `temp/` remain the only content source;
-  do not half-wire bundle fetching.
+- `internal/content` is the only consumer: it pins the release and index
+  digest, fetches through `internal/cache`, verifies the bundle and every
+  manifest file digest, and rejects a manifest whose `spec.commit` differs from
+  `sources.go`. Do not add a second downloader or a "latest" path.
+- `temp/` is scratch space, never a default content source. Only an explicit
+  `QUEST_DEFS_DIR` may point at local definitions for development; do not
+  reintroduce a default that reads the working directory.
 
 ## Commands
 
@@ -114,7 +118,7 @@ go build ./...
 go vet ./...
 gofmt -l .                # must print nothing before committing
 go test ./...
-go run ./cmd/quest        # reads course-definition.yml from temp/ by default
+go run ./cmd/quest        # uses verified quest-source content from the cache
 ```
 
 The content repository has its own module and commands; see

@@ -21,12 +21,14 @@ type Paths struct {
 	// CacheDir holds downloaded tester assets and user state. It is created
 	// on demand with 0700 permissions and is safe to delete.
 	CacheDir string
-	// DefsDir is where local course-definition.yml files are discovered.
+	// DefsDir overrides the content cache with local course-definition.yml
+	// files for development. Empty means "use verified quest-source content".
 	DefsDir string
 }
 
 // Resolve determines paths from the environment, falling back to the user
-// cache directory and the repository's gitignored temp/ directory.
+// cache directory. DefsDir is an explicit development override and is empty
+// by default: course content comes from the pinned quest-source release.
 func Resolve() Paths {
 	return Paths{
 		CacheDir: resolveCacheDir(),
@@ -52,8 +54,5 @@ func resolveCacheDir() string {
 }
 
 func resolveDefsDir() string {
-	if dir := os.Getenv(EnvDefsDir); dir != "" {
-		return dir
-	}
-	return "temp"
+	return os.Getenv(EnvDefsDir)
 }

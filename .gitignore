@@ -7,3 +7,6 @@ temp/
 
 # Separate content-bundle repo (track B)
 /quest-source/
+
+# Project marker written by the TUI into starter directories
+.quest/

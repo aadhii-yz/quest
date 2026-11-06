@@ -51,7 +51,7 @@ func (a *Adapter) Courses() []provider.Course {
 }
 
 func (a *Adapter) course(src *Source) provider.Course {
-	slug := slugFromRepo(src.RepoURL)
+	slug := src.Slug()
 	c := provider.Course{
 		ID:           slug,
 		ProviderID:   a.ID(),
@@ -114,6 +114,9 @@ func stages(def CourseDefinition) []provider.Stage {
 	return out
 }
 
+// Slug returns the course slug derived from the pinned specification URL.
+func (s Source) Slug() string { return slugFromRepo(s.RepoURL) }
+
 func slugFromRepo(repoURL string) string {
 	slug := filepath.Base(strings.TrimSuffix(repoURL, "/"))
 	return strings.TrimPrefix(slug, "build-your-own-")
@@ -123,6 +126,11 @@ func slugFromRepo(repoURL string) string {
 // or two directory levels below it (temp/<course>/, temp/<provider>/<course>/).
 func loadDefinitions(root string) map[string]CourseDefinition {
 	out := map[string]CourseDefinition{}
+	if root == "" {
+		// An empty override means content comes from the verified release.
+		// Globbing "" would resolve to filesystem-root paths.
+		return out
+	}
 	patterns := []string{
 		filepath.Join(root, "course-definition.yml"),
 		filepath.Join(root, "*", "course-definition.yml"),

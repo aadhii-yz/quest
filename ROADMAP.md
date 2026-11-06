@@ -15,7 +15,10 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
   download or extraction yet.
 - `internal/licensing` has the `LicenseNone` policy, but no persisted consent.
 - Content bundles pipeline exists in `quest-source/` and `content-0.1.0` is
-  published with all 12 CodeCrafters courses; quest does not consume it yet.
+  published with all 12 CodeCrafters courses.
+- `internal/content` verifies the pinned index, fetches bundles on demand and
+  checks the manifest against quest's spec pins; wiring it into the UI is the
+  remaining Phase 3 step.
 
 ## Decisions made
 
@@ -82,6 +85,14 @@ and a tampered asset or missing consent blocks execution.
 - [ ] `internal/workspace`: project directory per course (default under the
       user's home, override in config), starter template selection from content
       bundles, language toolchain detection.
+- [ ] `.quest/state.json` marker (course, language, stage) plus `Detect(dir)`
+      that walks up from the working directory. Starting quest inside a project
+      opens its course at the saved stage instead of the catalog; `esc` still
+      reaches the catalog.
+- [ ] TUI create flow: a key on the course screen prompts for a directory,
+      copies `starter_templates/all/code` then the language overlay from the
+      cached bundle, writes the marker, appends `.quest/` to the project's
+      `.gitignore`, and opens the course at stage 1.
 - [ ] Build/run the user's solution (`b` / `R`) as a separate runner, streamed
       into the log pane.
 - [ ] Editor handoff (`e`) via `$EDITOR`.
@@ -101,14 +112,15 @@ assets:   12 course bundles + index.json + checksums.txt (all checksums pass)
 
 - [x] Publish `content-0.1.0` from `quest-source/` (all 12 bundles + index +
       checksums; `sha256sum -c` verified).
-- [ ] Pin `ContentRelease` (`content-0.1.0`), `ContentRepo`
-      (`aadhii-yz/quest-source`) and `ContentIndexSHA256` (`c0f520f9…`) in the
-      CodeCrafters adapter.
-- [ ] Fetch the index through `internal/cache`, verify the digest, cache it;
-      render the catalog from the index without downloading bundles.
-- [ ] Fetch and extract a course bundle on demand, validate manifest
-      `format`/provider/course/`spec.commit`/license against quest pins, then
-      map it to `provider.Course`.
+- [x] Pin `ContentRelease` (`content-0.1.0`), `ContentRepo`
+      (`aadhii-yz/quest-source`) and `ContentIndexSHA256` (`c0f520f9…`) in
+      `internal/content`, and add the verified loader: index digest, bundle
+      digest and size, safe extraction, manifest format/provider/course, spec
+      commit and license against quest pins, and every manifest file digest.
+- [ ] Wire the loader into the app: catalog from the cached index, bundle on
+      course open, background refresh through a `tea.Cmd`; never block startup.
+- [ ] Map a verified bundle to `provider.Course` (definition + starter
+      templates) and keep `sources.go` as the fallback when no bundle exists.
 - [ ] Precedence: `QUEST_DEFS_DIR` (dev) > verified cached bundle > index-only.
 - [ ] Resolve async loading: `provider.Provider` is synchronous today. Either
       add `Load(ctx)` called from a `tea.Cmd` with loading state, or load cached

@@ -22,9 +22,10 @@ publishes `checksums.txt`; verify a download with
 quest --version
 ```
 
-Running from a checkout (`go run ./cmd/quest`) reads course definitions from
-`temp/` by default; see `QUEST_DEFS_DIR` and `QUEST_CACHE_DIR` in
-[AGENTS.md](AGENTS.md).
+Course content is loaded from the pinned `quest-source` release and verified
+against its index and bundle digests. `QUEST_DEFS_DIR` overrides that with a
+local directory of `course-definition.yml` files for development, and
+`QUEST_CACHE_DIR` moves the cache; see [AGENTS.md](AGENTS.md).
 
 Initially I am planning to support:
 
