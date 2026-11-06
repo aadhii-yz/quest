@@ -45,9 +45,14 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
       `provider.Artifact{URL, SHA256, Filename, Size}` to `provider.TesterPlan`,
       filled by the CodeCrafters adapter from pins, so `cache`/`runner` never
       import a provider implementation.
-- [ ] Spike (no code): establish how a pinned tester binary is invoked — args,
-      env, working directory, git requirements. Try `--help` in `temp/`.
-      Record findings in `internal/runner/doc.go`.
+- [x] Spike (no code): establish how a pinned tester binary is invoked.
+      Findings are in `internal/runner/doc.go`: testers read
+      `CODECRAFTERS_SUBMISSION_DIR` and `CODECRAFTERS_TEST_CASES_JSON` (stage
+      metadata, not test logic), and expect the course entrypoint script plus
+      `codecrafters.yml` from the starter templates. Exact argv, working
+      directory and tty needs are unverified until an unlicensed tester is run
+      with consent. The wrapper needs a CodeCrafters-cloned workspace; CLI v54
+      has no login command and refuses other remotes.
 
 ## Phase 1 — real test loop
 
@@ -63,7 +68,9 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
       release + digest; UI modal names the missing license; no approval, no
       fetch. Approval never carries to a new release/digest.
 - [ ] `runner.Direct`: exec the verified binary with `exec.CommandContext`,
-      sanitized env, streamed lines and exit status. Tests use a fake tester.
+      sanitized env, streamed lines and exit status. Build
+      `CODECRAFTERS_TEST_CASES_JSON` from the course definition and confirm the
+      log-prefix numbering for extension stages. Tests use a fake tester.
 - [ ] UI: show the active backend, download size before starting, progress, and
       consent prompt. Replace `Simulated` or keep it as an explicit dev mode.
 
@@ -136,4 +143,9 @@ assets:   12 course bundles + index.json + checksums.txt (all checksums pass)
 5. Starter template subsetting: ship every language from the bundle (current) or
    fetch only the selected language? Bundles are ~20-200 KB today, so ship all.
 6. Long-term: wrap the CodeCrafters CLI as the primary path (auth, submissions)
-   or keep direct execution primary and treat the wrapper as an option?
+   or keep direct execution primary and treat the wrapper as an option? The
+   direct path depends on reproducing CodeCrafters' stage metadata and
+   entrypoint expectations; the wrapper depends on a CI-cloned workspace.
+7. Does an extension stage number reset to 101 per extension, or run
+   cumulatively? Needed for `tester_log_prefix`; verify in the first consented
+   tester run instead of guessing.

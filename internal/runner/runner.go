@@ -1,9 +1,3 @@
-// Package runner executes testers and streams their output.
-//
-// The contract is deliberately small: a Request describes what to run and a
-// channel of Events carries plain output lines followed by a done event. Only
-// Simulated is implemented today; real execution will fetch a pinned asset
-// through internal/cache, verify its SHA256 and stream the process output.
 package runner
 
 import (
