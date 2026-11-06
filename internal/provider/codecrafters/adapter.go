@@ -78,8 +78,9 @@ func (a *Adapter) course(src *Source) provider.Course {
 	return c
 }
 
-// testerPlan reports what would be executed for this course on osArch. It
-// deliberately carries no download URL or hash: cache/runner own those.
+// testerPlan reports what would be executed for this course on osArch. The
+// plan carries the pinned artifact as data; cache/runner perform the download
+// and execution, and the provider never fetches anything.
 func testerPlan(src *Source, osArch string) provider.TesterPlan {
 	plan := provider.TesterPlan{
 		Platform: osArch,
@@ -89,6 +90,11 @@ func testerPlan(src *Source, osArch string) provider.TesterPlan {
 	if asset, ok := src.AssetFor(osArch); ok {
 		plan.Available = true
 		plan.AssetName = filepath.Base(asset.URL)
+		plan.Artifact = &provider.Artifact{
+			URL:      asset.URL,
+			SHA256:   asset.SHA256,
+			Filename: plan.AssetName,
+		}
 	}
 	return plan
 }

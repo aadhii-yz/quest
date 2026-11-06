@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,8 @@ const dirPerm = 0o700
 // Store is a directory of downloaded assets.
 type Store struct {
 	Dir string
+	// Client is used by Fetch. Nil means http.DefaultClient.
+	Client *http.Client
 }
 
 // NewStore returns a store rooted at dir.
@@ -64,12 +67,9 @@ func VerifyFile(path, want string) error {
 // VerifyReader checks that r hashes to the expected hex SHA256 digest. It
 // fails closed for an empty or malformed digest.
 func VerifyReader(r io.Reader, want string) error {
-	want = strings.ToLower(strings.TrimSpace(want))
-	if len(want) != sha256.Size*2 {
-		return fmt.Errorf("cache: invalid sha256 digest %q", want)
-	}
-	if _, err := hex.DecodeString(want); err != nil {
-		return fmt.Errorf("cache: invalid sha256 digest %q: %w", want, err)
+	want, err := validateDigest(want)
+	if err != nil {
+		return err
 	}
 
 	h := sha256.New()
@@ -81,4 +81,17 @@ func VerifyReader(r io.Reader, want string) error {
 		return fmt.Errorf("cache: sha256 mismatch: got %s want %s", got, want)
 	}
 	return nil
+}
+
+// validateDigest returns want lowercased after checking it is a 64-character
+// hex SHA256 digest.
+func validateDigest(want string) (string, error) {
+	want = strings.ToLower(strings.TrimSpace(want))
+	if len(want) != sha256.Size*2 {
+		return "", fmt.Errorf("cache: invalid sha256 digest %q", want)
+	}
+	if _, err := hex.DecodeString(want); err != nil {
+		return "", fmt.Errorf("cache: invalid sha256 digest %q: %w", want, err)
+	}
+	return want, nil
 }

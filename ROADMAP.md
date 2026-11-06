@@ -41,10 +41,10 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 - [ ] Extend `internal/config` with tester backend selection
       (`tester = "direct" | "codecrafters-cli"`, `codecrafters_bin`), file +
       env + flag precedence.
-- [ ] Decide artifact plumbing for the direct backend: add
-      `provider.Artifact{URL, SHA256, Filename}` (or similar) to
-      `provider.TesterPlan`, filled by the CodeCrafters adapter from pins, so
-      `cache`/`runner` never import a provider implementation.
+- [x] Decide artifact plumbing for the direct backend: add
+      `provider.Artifact{URL, SHA256, Filename, Size}` to `provider.TesterPlan`,
+      filled by the CodeCrafters adapter from pins, so `cache`/`runner` never
+      import a provider implementation.
 - [ ] Spike (no code): establish how a pinned tester binary is invoked — args,
       env, working directory, git requirements. Try `--help` in `temp/`.
       Record findings in `internal/runner/doc.go`.
@@ -53,10 +53,12 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 
 - [ ] `runner.Wrapper`: run the user's `codecrafters` CLI, stream output as
       `runner.Event`s, cancellable. Tests use a fake CLI on `PATH`.
-- [ ] `cache.Fetch`: download one pinned asset with progress and total size
+- [x] `cache.Fetch`: download one pinned asset with progress and total size
       (sqlite assets are ~365 MB), temp file, verify, atomic rename, fail closed.
-- [ ] `cache.Extract`: safe tar.gz extraction into a 0700 cache with traversal,
-      link, duplicate and size protections.
+      A verified cached file is reused without network access.
+- [x] `cache.Extract`: safe tar.gz extraction into a 0700 cache with traversal,
+      link, duplicate and size protections; extracts to a temp directory and
+      renames only on success.
 - [ ] `licensing` consent store: persisted in the cache dir, keyed by course +
       release + digest; UI modal names the missing license; no approval, no
       fetch. Approval never carries to a new release/digest.

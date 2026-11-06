@@ -28,6 +28,21 @@ type Stage struct {
 	Extension   string // extension slug, empty for base stages
 }
 
+// Artifact is a pinned release asset. It is data only: the provider states
+// where the asset lives and which digest it must have. Downloading and
+// verification belong to internal/cache, and execution to internal/runner.
+type Artifact struct {
+	// URL is the release asset download URL.
+	URL string
+	// SHA256 is the lowercase hex digest the downloaded file must match.
+	SHA256 string
+	// Filename is the published asset name, without path separators.
+	Filename string
+	// Size is the expected size in bytes, or 0 when not pinned. A non-zero
+	// size is enforced against the response before and after download.
+	Size int64
+}
+
 // TesterPlan describes whether a provider can run a tester for this course on
 // the current platform, without downloading anything.
 type TesterPlan struct {
@@ -41,6 +56,9 @@ type TesterPlan struct {
 	Release string
 	// License is the tester's licensing posture.
 	License LicenseStatus
+	// Artifact is the pinned asset for Platform, or nil when the course does
+	// not publish a build for it. Providers never download it.
+	Artifact *Artifact
 }
 
 // Course is a provider-neutral view of a guided project or problem set.

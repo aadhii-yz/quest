@@ -145,6 +145,18 @@ func TestTesterPlanAssetName(t *testing.T) {
 	if !strings.HasSuffix(plan.AssetName, "_linux_amd64.tar.gz") {
 		t.Fatalf("asset name = %q", plan.AssetName)
 	}
+	if plan.Artifact == nil {
+		t.Fatal("artifact is nil for an available platform")
+	}
+	if plan.Artifact.Filename != plan.AssetName {
+		t.Fatalf("artifact filename = %q, want %q", plan.Artifact.Filename, plan.AssetName)
+	}
+	if !strings.HasSuffix(plan.Artifact.URL, plan.AssetName) {
+		t.Fatalf("artifact url = %q, want suffix %q", plan.Artifact.URL, plan.AssetName)
+	}
+	if len(plan.Artifact.SHA256) != 64 {
+		t.Fatalf("artifact sha256 = %q", plan.Artifact.SHA256)
+	}
 	if plan.Release == "" {
 		t.Fatal("release should be pinned")
 	}
