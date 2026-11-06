@@ -21,6 +21,9 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 - Opening a course in the TUI loads its bundle on a `tea.Cmd`, shows a loading
   state and refreshes the course; `QUEST_DEFS_DIR` still wins as a dev
   override. Catalog metadata still comes from `sources.go`.
+- Projects exist: starting quest in a directory with `.quest/state.json` opens
+  its course at the saved stage, and `c` creates a starter directory from the
+  verified bundle.
 
 ## Decisions made
 
@@ -84,22 +87,23 @@ and a tampered asset or missing consent blocks execution.
 
 ## Phase 2 — workspace
 
-- [ ] `internal/workspace`: project directory per course (default under the
-      user's home, override in config), starter template selection from content
-      bundles, language toolchain detection.
-- [ ] `.quest/state.json` marker (course, language, stage) plus `Detect(dir)`
-      that walks up from the working directory. Starting quest inside a project
-      opens its course at the saved stage instead of the catalog; `esc` still
-      reaches the catalog.
-- [ ] TUI create flow: a key on the course screen prompts for a directory,
-      copies `starter_templates/all/code` then the language overlay from the
-      cached bundle, writes the marker, appends `.quest/` to the project's
-      `.gitignore`, and opens the course at stage 1.
+- [x] `internal/workspace`: detect `.quest/state.json` by walking up from the
+      working directory, save it atomically at 0600, and create starter
+      directories from verified bundles (`all/code`, then `<language>/code`)
+      without overwriting a non-empty destination.
+- [x] TUI create flow: `c` on the course screen prompts for a directory, copies
+      the templates, writes the marker, appends `.quest/` to the project's
+      `.gitignore`, and reports the result in the test log.
+- [x] Start inside a project on its saved course, language and stage; moving
+      the stage or switching language persists the marker. A broken marker is
+      reported and the catalog still opens.
 - [ ] Build/run the user's solution (`b` / `R`) as a separate runner, streamed
       into the log pane.
+- [ ] Language toolchain detection from the starter `config.yml`
+      (`required_executable`, `user_editable_file`).
 - [ ] Editor handoff (`e`) via `$EDITOR`.
-- [ ] `internal/state`: last course/language/stage and completed stages in the
-      cache dir, atomic JSON writes.
+- [ ] Global state beyond the per-project marker (last catalog position) only
+      if it proves necessary.
 
 ## Phase 3 — content integration
 

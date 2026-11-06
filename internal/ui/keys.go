@@ -70,6 +70,7 @@ type courseKeys struct {
 	ToggleStages key.Binding
 	ToggleTests  key.Binding
 	Run          key.Binding
+	Create       key.Binding
 	Help         key.Binding
 	Quit         key.Binding
 }
@@ -112,6 +113,10 @@ func defaultCourseKeys() courseKeys {
 			key.WithKeys("r"),
 			key.WithHelp("r", "run"),
 		),
+		Create: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "create project"),
+		),
 		Help: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "help"),
@@ -134,6 +139,6 @@ func (k courseKeys) FullHelp() [][]key.Binding {
 		{k.Back, k.NextPane, k.PrevPane},
 		{k.NextStage, k.PrevStage, k.NextLanguage},
 		{k.ToggleStages, k.ToggleTests, k.Run},
-		{k.Help, k.Quit},
+		{k.Create, k.Help, k.Quit},
 	}
 }

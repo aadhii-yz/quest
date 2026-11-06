@@ -22,6 +22,11 @@ publishes `checksums.txt`; verify a download with
 quest --version
 ```
 
+Inside a starter directory (one containing `.quest/state.json`), quest opens
+that course at the saved stage instead of the catalog. On a course screen,
+press `c` to create a starter directory: it copies the verified starter
+templates, writes the marker and adds `.quest/` to the project's `.gitignore`.
+
 Course content is loaded from the pinned `quest-source` release and verified
 against its index and bundle digests. A course bundle is fetched and verified
 the first time you open that course; later runs use the cache. `QUEST_DEFS_DIR` overrides that with a

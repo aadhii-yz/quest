@@ -6,6 +6,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -21,6 +22,7 @@ import (
 	"github.com/aadhii-yz/quest/internal/provider/codecrafters"
 	"github.com/aadhii-yz/quest/internal/runner"
 	"github.com/aadhii-yz/quest/internal/ui"
+	"github.com/aadhii-yz/quest/internal/workspace"
 )
 
 func main() {
@@ -43,7 +45,10 @@ func main() {
 	}
 
 	defsDir := cfg.DefsDir
-	var loader ui.ContentLoader
+	var (
+		loader  ui.ContentLoader
+		project *projectStore
+	)
 	if defsDir == "" {
 		// No local override: read verified bundles from the pinned release.
 		// The cache root doubles as the adapter's definitions directory.
@@ -53,12 +58,26 @@ func main() {
 			store: store,
 			build: func() []provider.Provider { return buildProviders(store.Root()) },
 		}
+		project = &projectStore{store: store}
+	}
+
+	opts := []ui.Option{ui.WithContentLoader(loader)}
+	if project != nil {
+		opts = append(opts, ui.WithWorkspace(project))
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		if root, state, detectErr := workspace.Detect(cwd); detectErr == nil {
+			opts = append(opts, ui.WithStart(root, state.Course, state.Language, state.Stage))
+		} else if !errors.Is(detectErr, workspace.ErrNotFound) {
+			// A broken marker must not prevent browsing the catalog.
+			fmt.Fprintf(os.Stderr, "quest: %v\n", detectErr)
+		}
 	}
 
 	program := tea.NewProgram(ui.New(
 		buildProviders(defsDir),
 		runner.Simulated{Delay: 180 * time.Millisecond},
-		ui.WithContentLoader(loader),
+		opts...,
 	))
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "quest: %v\n", err)

@@ -68,6 +68,8 @@ type courseModel struct {
 	descSlug string
 
 	loading bool
+	// pendingStage is the stage to select once a content bundle arrives.
+	pendingStage string
 }
 
 func newCourseModel(t *theme, c provider.Course, langIdx int, r runner.Runner) *courseModel {
@@ -126,10 +128,11 @@ func (c *courseModel) finishLoading() {
 // setCourse swaps in a provider.Course after its content was loaded, keeping
 // the selected stage and language where they still exist.
 func (c *courseModel) setCourse(cr provider.Course) {
-	stageID := ""
+	stageID := c.pendingStage
 	if stage, ok := c.stage(); ok {
 		stageID = stage.ID
 	}
+	c.pendingStage = ""
 	lang := c.language()
 
 	c.course = cr
@@ -160,6 +163,21 @@ func (c *courseModel) setCourse(cr provider.Course) {
 	c.refreshDescription(true)
 	c.appendLog(fmt.Sprintf("content loaded: %d stages", len(cr.Stages)))
 	c.layout(c.width, c.height)
+}
+
+// selectStageByID moves the stage cursor to the given stage when present.
+func (c *courseModel) selectStageByID(id string) {
+	if id == "" {
+		return
+	}
+	for i, item := range c.stages.Items() {
+		stage, ok := item.(stageItem)
+		if ok && stage.stage.ID == id {
+			c.stages.Select(i)
+			c.syncStage()
+			return
+		}
+	}
 }
 
 func (c *courseModel) language() string {

@@ -39,6 +39,7 @@ internal/cache/               user cache directory, asset storage, SHA256 verifi
 internal/content/             verified quest-source release: index, bundles, manifest checks
 internal/licensing/           license policy: which testers need explicit consent
 internal/runner/              tester execution contract; simulated runner for now
+internal/workspace/           project markers: detect, save and create starter dirs
 internal/ui/                  Bubble Tea / Lip Gloss / Glamour code
   app.go                      root model, routing, layout, chrome
   catalog.go                  catalog screen: resources, courses, language
@@ -63,8 +64,9 @@ Dependencies point one way:
 
 ```
 cmd/quest -> internal/ui -> internal/provider, internal/runner, internal/cache, internal/licensing
-cmd/quest -> internal/content
+cmd/quest -> internal/content, internal/workspace
 internal/content -> internal/cache, internal/provider
+internal/workspace            filesystem only, no provider or UI imports
 internal/ui -> internal/config            (paths only)
 internal/provider/codecrafters -> internal/provider, YAML wire types and pins
 internal/cache, internal/runner, internal/licensing -> internal/provider
@@ -233,6 +235,10 @@ UI:
   list's width to the panel's inner content width or rows will wrap.
 - Key bindings and help text live in `keys.go`; every screen exposes a
   `help.KeyMap`. Do not hardcode footer hint strings.
+- A project is a starter directory with `.quest/state.json`; starting quest
+  inside one opens its course instead of the catalog. Creation and persistence
+  go through the `ui.Workspace` interface injected by `cmd/quest`; the UI must
+  not write project files or read the marker itself.
 - Components are updated in `Update`; the root model forwards unrecognised
   messages to the focused component (filter matches, cursor blinks, runner
   events). Swallowing component messages breaks Bubble Tea components.

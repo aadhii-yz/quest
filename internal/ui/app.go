@@ -10,6 +10,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -35,6 +36,17 @@ type app struct {
 	course *courseModel
 	runner runner.Runner
 	loader ContentLoader
+	ws     Workspace
+
+	workspaceDir  string
+	startCourse   string
+	startLanguage string
+	startStage    string
+	savedStage    string
+	savedLanguage string
+	initCmd       tea.Cmd
+
+	prompt *textinput.Model
 
 	help       help.Model
 	catKeys    catalogKeys
@@ -48,6 +60,24 @@ type Option func(*app)
 // loader is wired in cmd/quest; a nil loader disables content loading.
 func WithContentLoader(l ContentLoader) Option {
 	return func(a *app) { a.loader = l }
+}
+
+// WithWorkspace enables project creation and state persistence.
+func WithWorkspace(w Workspace) Option {
+	return func(a *app) { a.ws = w }
+}
+
+// WithStart opens the given course at the saved language and stage instead of
+// the catalog. dir is the detected project root, used when persisting changes.
+func WithStart(dir, courseID, language, stageID string) Option {
+	return func(a *app) {
+		a.workspaceDir = dir
+		a.startCourse = courseID
+		a.startLanguage = language
+		a.startStage = stageID
+		a.savedStage = stageID
+		a.savedLanguage = language
+	}
 }
 
 // New returns the root model for tea.NewProgram.
@@ -69,11 +99,42 @@ func newApp(providers []provider.Provider, r runner.Runner, opts ...Option) app 
 	for _, opt := range opts {
 		opt(&m)
 	}
+	m.openStart()
 	return m
 }
 
+// openStart enters the course selected by WithStart, if it is known.
+func (m *app) openStart() {
+	if m.startCourse == "" {
+		return
+	}
+	c, ok := findCourse(m.cat.providers, m.startCourse)
+	if !ok {
+		return
+	}
+	langIdx := 0
+	for i, l := range c.Languages {
+		if l == m.startLanguage {
+			langIdx = i
+			break
+		}
+	}
+	m.course = newCourseModel(m.theme, c, langIdx, m.runner)
+	m.course.selectStageByID(m.startStage)
+	m.course.pendingStage = m.startStage
+	m.view = viewCourse
+	if m.loader != nil && !c.Ready() {
+		m.course.beginLoading()
+		m.initCmd = loadContentCmd(m.loader, c.ID)
+	}
+}
+
 func (m app) Init() tea.Cmd {
-	return tea.Batch(tea.RequestWindowSize, tea.RequestBackgroundColor)
+	cmds := []tea.Cmd{tea.RequestWindowSize, tea.RequestBackgroundColor}
+	if m.initCmd != nil {
+		cmds = append(cmds, m.initCmd)
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -96,11 +157,20 @@ func (m app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case contentLoadedMsg:
 		return m.handleContentLoaded(msg), nil
+	case workspaceMsg:
+		return m.handleWorkspaceMsg(msg), nil
 	default:
 		// Component messages (list filter matches, cursor blinks, ...) must
 		// reach the focused component, not be swallowed by the root model.
+		if m.prompt != nil {
+			var cmd tea.Cmd
+			*m.prompt, cmd = m.prompt.Update(msg)
+			return m, cmd
+		}
 		if m.view == viewCourse && m.course != nil {
-			return m, m.course.updateFocused(msg)
+			cmd := m.course.updateFocused(msg)
+			next, saveCmd := m.persistWorkspace()
+			return next, tea.Batch(cmd, saveCmd)
 		}
 		return m, m.cat.updateFocused(msg)
 	}
@@ -117,6 +187,9 @@ func (m app) View() tea.View {
 func (m app) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		return m, tea.Quit
+	}
+	if m.prompt != nil {
+		return m.handlePromptKey(msg)
 	}
 	if m.view == viewCourse && m.course != nil {
 		return m.handleCourseKey(msg)
@@ -172,6 +245,95 @@ func (m app) openSelection() (tea.Model, tea.Cmd) {
 	return m, loadContentCmd(m.loader, c.ID)
 }
 
+// persistWorkspace writes the selection when it changed and quest is inside a
+// project. It is a no-op otherwise.
+func (m app) persistWorkspace() (app, tea.Cmd) {
+	if m.ws == nil || m.workspaceDir == "" || m.course == nil {
+		return m, nil
+	}
+	stage, ok := m.course.stage()
+	if !ok {
+		return m, nil
+	}
+	language := m.course.language()
+	if stage.ID == m.savedStage && language == m.savedLanguage {
+		return m, nil
+	}
+	m.savedStage, m.savedLanguage = stage.ID, language
+	return m, saveWorkspaceCmd(m.ws, m.workspaceDir, m.course.course.ID, language, stage.ID)
+}
+
+// beginCreate opens the create-project prompt for the open course.
+func (m *app) beginCreate() tea.Cmd {
+	if m.ws == nil || m.course == nil {
+		return nil
+	}
+	input := textinput.New()
+	input.Placeholder = "~/quest/" + m.course.course.ID
+	input.SetValue("~/quest/" + m.course.course.ID)
+	input.SetWidth(clampInt(m.width-24, 20, 80))
+	cmd := input.Focus()
+	m.prompt = &input
+	m.layout()
+	return cmd
+}
+
+// handlePromptKey edits the create-project path; enter starts creation and esc
+// cancels without touching the filesystem.
+func (m app) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.prompt == nil {
+		return m, nil
+	}
+	switch msg.Code {
+	case tea.KeyEscape:
+		m.prompt = nil
+		m.layout()
+		return m, nil
+	case tea.KeyEnter:
+		dir := strings.TrimSpace(m.prompt.Value())
+		if dir == "" {
+			return m, nil
+		}
+		course := m.course.course.ID
+		language := m.course.language()
+		stage, _ := m.course.stage()
+		m.prompt = nil
+		m.layout()
+		if m.ws == nil {
+			return m, nil
+		}
+		m.course.appendLog("creating project in " + dir + "…")
+		return m, createWorkspaceCmd(m.ws, dir, course, language, stage.ID)
+	}
+	var cmd tea.Cmd
+	*m.prompt, cmd = m.prompt.Update(msg)
+	return m, cmd
+}
+
+// handleWorkspaceMsg reports creation and save results in the course log.
+func (m app) handleWorkspaceMsg(msg workspaceMsg) app {
+	if m.course == nil {
+		return m
+	}
+	if msg.err != nil {
+		if msg.created {
+			m.course.appendLog("create  " + msg.err.Error())
+		} else {
+			m.course.appendLog("state   " + msg.err.Error())
+		}
+		return m
+	}
+	if msg.created {
+		m.workspaceDir = msg.dir
+		if stage, ok := m.course.stage(); ok {
+			m.savedStage = stage.ID
+		}
+		m.savedLanguage = m.course.language()
+		m.course.appendLog("created project in " + msg.dir)
+	}
+	return m
+}
+
 // handleContentLoaded refreshes the catalog and the open course after a bundle
 // was fetched and verified.
 func (m app) handleContentLoaded(msg contentLoadedMsg) app {
@@ -219,10 +381,15 @@ func (m app) handleCourseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.layout()
 	case key.Matches(msg, m.courseKeys.NextStage):
 		c.selectStage(1)
+		return m.persistWorkspace()
 	case key.Matches(msg, m.courseKeys.PrevStage):
 		c.selectStage(-1)
+		return m.persistWorkspace()
 	case key.Matches(msg, m.courseKeys.NextLanguage):
 		c.nextLanguage()
+		return m.persistWorkspace()
+	case key.Matches(msg, m.courseKeys.Create):
+		return m, m.beginCreate()
 	case key.Matches(msg, m.courseKeys.Run):
 		return m, c.startRun()
 	default:
@@ -244,6 +411,9 @@ func (m *app) layout() {
 	}
 	m.help.SetWidth(m.width)
 	helpH := lipgloss.Height(m.help.View(m.activeKeys()))
+	if m.prompt != nil {
+		helpH = 1
+	}
 	bodyH := max(m.height-1-helpH, 1)
 	if m.view == viewCourse && m.course != nil {
 		m.course.layout(m.width, bodyH)
@@ -267,8 +437,22 @@ func (m app) viewString() string {
 	if m.view == viewCourse && m.course != nil {
 		body = m.course.view()
 	}
-	content := lipgloss.JoinVertical(lipgloss.Left, m.header(), body, m.help.View(m.activeKeys()))
+	footer := m.help.View(m.activeKeys())
+	if m.prompt != nil {
+		footer = m.promptView()
+	}
+	content := lipgloss.JoinVertical(lipgloss.Left, m.header(), body, footer)
 	return fitScreen(content, m.width, m.height)
+}
+
+// promptView renders the create-project prompt in place of the help footer.
+func (m app) promptView() string {
+	if m.prompt == nil {
+		return ""
+	}
+	left := m.theme.accentBold("create") + " " + m.prompt.View()
+	right := m.theme.muted("enter create · esc cancel")
+	return bar(left, right, m.width)
 }
 
 func (m app) header() string {
