@@ -36,6 +36,7 @@ internal/provider/            contracts every problem source implements
     adapter.go                adapts the pinned sources + definitions to provider.Course
     README.md                 upstream repo table with license status
 internal/cache/               user cache directory, asset storage, SHA256 verification
+internal/content/             verified quest-source release: index, bundles, manifest checks
 internal/licensing/           license policy: which testers need explicit consent
 internal/runner/              tester execution contract; simulated runner for now
 internal/ui/                  Bubble Tea / Lip Gloss / Glamour code
@@ -62,6 +63,8 @@ Dependencies point one way:
 
 ```
 cmd/quest -> internal/ui -> internal/provider, internal/runner, internal/cache, internal/licensing
+cmd/quest -> internal/content
+internal/content -> internal/cache, internal/provider
 internal/ui -> internal/config            (paths only)
 internal/provider/codecrafters -> internal/provider, YAML wire types and pins
 internal/cache, internal/runner, internal/licensing -> internal/provider
@@ -79,6 +82,10 @@ internal/cache, internal/runner, internal/licensing -> internal/provider
   `internal/licensing` and `internal/runner`.
 - Execution output reaches the UI as `runner.Event` values. Do not fabricate
   tester output, verification steps or pass/fail results in UI code.
+- Content fetching lives in `internal/content` and is injected into the UI as a
+  `ui.ContentLoader` built in `cmd/quest`. The UI must not import
+  `internal/content` or any provider implementation, and must not fetch by
+  itself.
 - Read environment variables and user paths in `internal/config` or in
   `cmd/quest`, not inside domain packages. Inject paths (for example the local
   definitions directory) rather than calling `os.Getenv` deep in an adapter.

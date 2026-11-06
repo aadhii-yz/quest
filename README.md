@@ -23,7 +23,8 @@ quest --version
 ```
 
 Course content is loaded from the pinned `quest-source` release and verified
-against its index and bundle digests. `QUEST_DEFS_DIR` overrides that with a
+against its index and bundle digests. A course bundle is fetched and verified
+the first time you open that course; later runs use the cache. `QUEST_DEFS_DIR` overrides that with a
 local directory of `course-definition.yml` files for development, and
 `QUEST_CACHE_DIR` moves the cache; see [AGENTS.md](AGENTS.md).
 

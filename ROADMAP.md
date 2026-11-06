@@ -17,8 +17,10 @@ repo at `quest-source/` (see `quest-source/AGENTS.md` and `quest-source/docs/`).
 - Content bundles pipeline exists in `quest-source/` and `content-0.1.0` is
   published with all 12 CodeCrafters courses.
 - `internal/content` verifies the pinned index, fetches bundles on demand and
-  checks the manifest against quest's spec pins; wiring it into the UI is the
-  remaining Phase 3 step.
+  checks the manifest against quest's spec pins.
+- Opening a course in the TUI loads its bundle on a `tea.Cmd`, shows a loading
+  state and refreshes the course; `QUEST_DEFS_DIR` still wins as a dev
+  override. Catalog metadata still comes from `sources.go`.
 
 ## Decisions made
 
@@ -117,8 +119,11 @@ assets:   12 course bundles + index.json + checksums.txt (all checksums pass)
       `internal/content`, and add the verified loader: index digest, bundle
       digest and size, safe extraction, manifest format/provider/course, spec
       commit and license against quest pins, and every manifest file digest.
-- [ ] Wire the loader into the app: catalog from the cached index, bundle on
-      course open, background refresh through a `tea.Cmd`; never block startup.
+- [x] Wire the loader into the app: inject `ui.ContentLoader` from `cmd/quest`,
+      load a bundle on course open via `tea.Cmd`, show a loading state and
+      replace the providers, course and catalog selection afterwards.
+- [ ] Render catalog names and summaries from the cached index instead of
+      `sources.go`; keep the pin fallback when the index is unavailable.
 - [ ] Map a verified bundle to `provider.Course` (definition + starter
       templates) and keep `sources.go` as the fallback when no bundle exists.
 - [ ] Precedence: `QUEST_DEFS_DIR` (dev) > verified cached bundle > index-only.

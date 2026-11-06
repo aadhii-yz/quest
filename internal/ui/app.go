@@ -34,20 +34,30 @@ type app struct {
 	cat    *catalog
 	course *courseModel
 	runner runner.Runner
+	loader ContentLoader
 
 	help       help.Model
 	catKeys    catalogKeys
 	courseKeys courseKeys
 }
 
-// New returns the root model for tea.NewProgram.
-func New(providers []provider.Provider, r runner.Runner) tea.Model {
-	return newApp(providers, r)
+// Option configures the root model.
+type Option func(*app)
+
+// WithContentLoader lets the UI request verified content for a course. The
+// loader is wired in cmd/quest; a nil loader disables content loading.
+func WithContentLoader(l ContentLoader) Option {
+	return func(a *app) { a.loader = l }
 }
 
-func newApp(providers []provider.Provider, r runner.Runner) app {
+// New returns the root model for tea.NewProgram.
+func New(providers []provider.Provider, r runner.Runner, opts ...Option) tea.Model {
+	return newApp(providers, r, opts...)
+}
+
+func newApp(providers []provider.Provider, r runner.Runner, opts ...Option) app {
 	t := newTheme(true)
-	return app{
+	m := app{
 		view:       viewCatalog,
 		theme:      t,
 		cat:        newCatalog(t, providers),
@@ -56,6 +66,10 @@ func newApp(providers []provider.Provider, r runner.Runner) app {
 		catKeys:    defaultCatalogKeys(),
 		courseKeys: defaultCourseKeys(),
 	}
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return m
 }
 
 func (m app) Init() tea.Cmd {
@@ -80,6 +94,8 @@ func (m app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.course.handleEvent(msg)
 		}
 		return m, nil
+	case contentLoadedMsg:
+		return m.handleContentLoaded(msg), nil
 	default:
 		// Component messages (list filter matches, cursor blinks, ...) must
 		// reach the focused component, not be swallowed by the root model.
@@ -147,7 +163,34 @@ func (m app) openSelection() (tea.Model, tea.Cmd) {
 	m.course = newCourseModel(m.theme, c, m.cat.languageIndex(), m.runner)
 	m.view = viewCourse
 	m.layout()
-	return m, nil
+	if m.loader == nil {
+		return m, nil
+	}
+	if !c.Ready() {
+		m.course.beginLoading()
+	}
+	return m, loadContentCmd(m.loader, c.ID)
+}
+
+// handleContentLoaded refreshes the catalog and the open course after a bundle
+// was fetched and verified.
+func (m app) handleContentLoaded(msg contentLoadedMsg) app {
+	if len(msg.providers) > 0 {
+		m.cat.setProviders(msg.providers)
+	}
+	if m.course == nil || m.course.course.ID != msg.slug {
+		return m
+	}
+	if msg.err != nil {
+		m.course.finishLoading()
+		m.course.appendLog("content  " + msg.err.Error())
+		return m
+	}
+	if c, ok := findCourse(msg.providers, msg.slug); ok {
+		m.course.setCourse(c)
+		m.layout()
+	}
+	return m
 }
 
 func (m app) handleCourseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {

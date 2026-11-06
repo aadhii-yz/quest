@@ -187,6 +187,35 @@ func (c *catalog) refresh() {
 	c.resize()
 }
 
+// setProviders replaces the provider list after content was loaded elsewhere,
+// keeping the selected provider, course and language positions when possible.
+func (c *catalog) setProviders(providers []provider.Provider) {
+	provIdx, courseIdx, langIdx := c.resources.Index(), c.courses.Index(), c.languages.Index()
+
+	c.providers = providers
+	items := make([]list.Item, 0, len(providers))
+	for _, p := range providers {
+		items = append(items, resourceItem{p})
+	}
+	c.resources.SetItems(items)
+	if n := len(items); n > 0 {
+		c.resources.Select(clampInt(provIdx, 0, n-1))
+	}
+	c.lastProviderID = ""
+	c.lastCourseID = ""
+	c.refresh()
+
+	if n := len(c.courses.Items()); n > 0 {
+		c.courses.Select(clampInt(courseIdx, 0, n-1))
+		c.lastCourseID = ""
+		c.refresh()
+	}
+	if n := len(c.languages.Items()); n > 0 {
+		c.languages.Select(clampInt(langIdx, 0, n-1))
+	}
+	c.resize()
+}
+
 // updateFocused forwards a message to the focused list and refreshes the
 // dependent columns afterwards.
 func (c *catalog) updateFocused(msg tea.Msg) tea.Cmd {

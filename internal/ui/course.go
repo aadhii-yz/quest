@@ -66,6 +66,8 @@ type courseModel struct {
 
 	descKey  string
 	descSlug string
+
+	loading bool
 }
 
 func newCourseModel(t *theme, c provider.Course, langIdx int, r runner.Runner) *courseModel {
@@ -105,6 +107,59 @@ func newCourseModel(t *theme, c provider.Course, langIdx int, r runner.Runner) *
 	}
 	m.refreshLog()
 	return m
+}
+
+// beginLoading marks the course as waiting for a content bundle.
+func (c *courseModel) beginLoading() {
+	c.loading = true
+	c.descKey = ""
+	c.refreshDescription(true)
+}
+
+// finishLoading clears the loading state after a failed load.
+func (c *courseModel) finishLoading() {
+	c.loading = false
+	c.descKey = ""
+	c.refreshDescription(true)
+}
+
+// setCourse swaps in a provider.Course after its content was loaded, keeping
+// the selected stage and language where they still exist.
+func (c *courseModel) setCourse(cr provider.Course) {
+	stageID := ""
+	if stage, ok := c.stage(); ok {
+		stageID = stage.ID
+	}
+	lang := c.language()
+
+	c.course = cr
+	c.loading = false
+	for i, l := range cr.Languages {
+		if l == lang {
+			c.langIdx = i
+			break
+		}
+	}
+
+	items := make([]list.Item, 0, len(cr.Stages))
+	for _, stage := range cr.Stages {
+		items = append(items, stageItem{stage: stage})
+	}
+	c.stages.SetItems(items)
+	idx := 0
+	for i, stage := range cr.Stages {
+		if stage.ID == stageID {
+			idx = i
+			break
+		}
+	}
+	if len(items) > 0 {
+		c.stages.Select(idx)
+	}
+	c.descKey, c.descSlug = "", ""
+	c.refreshDescription(true)
+	c.appendLog(fmt.Sprintf("content loaded: %d stages", len(cr.Stages)))
+	c.layout(c.width, c.height)
 }
 
 func (c *courseModel) language() string {
@@ -275,6 +330,12 @@ func (c *courseModel) refreshDescription(force bool) {
 
 func (c *courseModel) emptyDescription() string {
 	var b strings.Builder
+	if c.loading {
+		b.WriteString(c.theme.bold("Loading content…"))
+		b.WriteString("\n\n")
+		b.WriteString(c.theme.muted("Fetching and verifying the pinned quest-source bundle."))
+		return b.String()
+	}
 	b.WriteString(c.theme.bold("No stage list loaded"))
 	b.WriteString("\n\n")
 	if c.course.Note != "" {
@@ -409,6 +470,9 @@ func (c *courseModel) view() string {
 func (c *courseModel) descTitle() string {
 	stage, ok := c.stage()
 	if !ok {
+		if c.loading {
+			return c.theme.accentBold("stage") + c.theme.warn(" · loading content…")
+		}
 		return c.theme.accentBold("stage")
 	}
 	title := fmt.Sprintf("stage %d/%d", stage.Number, len(c.course.Stages))

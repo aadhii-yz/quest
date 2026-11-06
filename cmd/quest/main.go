@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/aadhii-yz/quest/internal/config"
+	"github.com/aadhii-yz/quest/internal/content"
 	"github.com/aadhii-yz/quest/internal/provider"
 	"github.com/aadhii-yz/quest/internal/provider/aoc"
 	"github.com/aadhii-yz/quest/internal/provider/codecrafters"
@@ -29,16 +30,36 @@ func main() {
 	}
 
 	cfg := config.Resolve()
-	providers := []provider.Provider{
-		codecrafters.New(cfg.DefsDir),
-		aoc.New(),
-		provider.NewPlaceholder("exercism", "Exercism",
-			"Mentored exercises and concept tracks. Not wired up yet."),
-		provider.NewPlaceholder("open-source", "Open-source courses",
-			"Other openly licensed guided projects will be added here."),
+
+	buildProviders := func(defsDir string) []provider.Provider {
+		return []provider.Provider{
+			codecrafters.New(defsDir),
+			aoc.New(),
+			provider.NewPlaceholder("exercism", "Exercism",
+				"Mentored exercises and concept tracks. Not wired up yet."),
+			provider.NewPlaceholder("open-source", "Open-source courses",
+				"Other openly licensed guided projects will be added here."),
+		}
 	}
 
-	program := tea.NewProgram(ui.New(providers, runner.Simulated{Delay: 180 * time.Millisecond}))
+	defsDir := cfg.DefsDir
+	var loader ui.ContentLoader
+	if defsDir == "" {
+		// No local override: read verified bundles from the pinned release.
+		// The cache root doubles as the adapter's definitions directory.
+		store := content.New(cfg.CacheDir, contentPins())
+		defsDir = store.Root()
+		loader = &contentLoader{
+			store: store,
+			build: func() []provider.Provider { return buildProviders(store.Root()) },
+		}
+	}
+
+	program := tea.NewProgram(ui.New(
+		buildProviders(defsDir),
+		runner.Simulated{Delay: 180 * time.Millisecond},
+		ui.WithContentLoader(loader),
+	))
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "quest: %v\n", err)
 		os.Exit(1)
